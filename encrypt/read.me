@@ -1,0 +1,375 @@
+FILES
+
+	enigma.lib:	routines implementing full 8 bit encryption.
+	enigma127.lib:	routines implementing enigma127 encryption.
+	enigma97.lib:	routines implementing enigma97 encryption.
+	enigma89.lib:	routines implementing enigma89 encryption.
+	enmigma.h:	header file to include for encryption routines.
+	encrypt.c:	example of how to use the encryption routines.
+	decrypt.c:	example of how to use the decryption routines.
+	makefile:	makefile for example programs (encrypt.c and
+			decrypt.c).
+	map89.h:	header file for ancillary functions map89() and
+			unmap89().
+	map97.h:	header file for ancillary functions map97() and
+			unmap97().
+	map127.h:	header file for ancillary functions map127() and
+			unmap127().
+	map257.h:	header file defines MAP/UNMAP macros for full 8-bit
+			encryption.
+
+CHANGES
+
+This version of the enigma libraries provides reentrant functions to implement
+the enigma encryption/decryption algorithms.  The previous non-reentrant
+libraries limited you to processing data stream sequentially, the current
+version allows concurrent processing of multiple data streams.  Also added is
+the ability to specify how many "rotors" your enigma engine has.
+
+WHAT IS ENIGMA?
+
+This is a set of libraries of encryption and decryption routines.  There are
+4 libraries each implementing similar but slightly different encryption and
+decryption routines.  They differ mainly in the cipher sets they support.
+
+The routines in enigma.lib encrypt and decrypt all the 8-bit bytes.
+
+The routines in enigma127.lib encrypt and decrypt all the 7-bit ASCII char-
+acters except NUL (0x0) and DEL (0x7F).
+
+The routines in enigma97.lib encrypt and decrypt all the printable ASCII
+characters except newline.
+
+The routines in enigma89.lib encrypt and decrypt most of the printable ASCII
+characters except whitespace and the following: '"', '%', '&', '\'', '\\'
+and '`'.
+
+The routines that do not encrypt all 8-bit bytes (enigma127, enigma97 and
+enigma89) do not encrypt or decrypt characters not in their cipher sets,
+these characters are passed through unchanged.
+
+Each of the libraries contains the following 4 routines:
+
+	enigmaOpen()
+	enigmaEncrypt()
+	enigmaDecrypt()
+	enigmaClose()
+
+The following 3 routines are also included for backwards compatibility with
+previous versions of these libraries:
+
+	setRotors()
+	encrypt()
+	decrypt()
+
+The parameters passed to each of the above routines are the same for all 4
+libraries.  The discussion that follows applies equally to all the versions
+of these routines.
+
+The enigma encryption/decryption libraries are based loosely on the Enigma
+encryption engine used by the Germans in WWII.  The Enigma machine had rotors
+that had to be set to an intial position before encrypting or decrypting a
+message.  Like the Enigma machine the "rotors" in our software version of the
+Enigma machine must be set to the same initial position to decrypt a message
+as when the message was encrypted.  The enigmaOpen() routine does this.  The
+enigmaEncrypt() and enigmaDecrypt() routines are the inverses of each other.
+If you put the plain text through the enigmaEncrypt() routine, putting the
+cipher text output from enigmaEncrypt() through the enigmaDecrypt() routine
+will return the original plain text, assuming you set the rotors to the same
+initial position.  It really doesn't matter if you use enigmaEncrypt() or
+enigmaDecrypt() first, just so long as you use the other routine to restore
+the original text.  When you are finished encrypting or decrypting a data
+stream you should call the enigmaClose() routine on the ENIGMA object
+associated with the stream (obtained from the enigmaOpen() routine) to release
+memory resources back to the operating system.
+
+Here are the technical descriptions of the enigma routines:
+
+enigmaOpen:
+
+	#include "engima.h"
+
+	ENIGMA *enmigmaOpen ( unsigned char *key, int keyLength,
+					unsigned char *seed, int maxRotors )
+
+		enigmaOpen() sets the initial position of the "rotors" in the
+		enigma machine.  A key must be supplied.  The key should have
+		at least one character for each rotor specified by the
+		maxRotors parameter, but this is not enforced.  The key should
+		be composed of characters from the cipher set, but may be any
+		valid 8-bit octet including NUL.  A keyLength parameter must
+		be supplied to tell the routine how many characters the key
+		contains (which may include the NUL character).  The seed is a
+		2 character array that controls how the key is hashed, and if
+		not supplied (seed == NULL) one is selected at random.  The
+		maxRotors parameter sets the number of "rotors" the ENIGMA
+		object implements.  This parameter must be 4 or greater, if
+		not the function aborts and returns the NULL pointer.
+
+		If successful, The enigmaOpen() routine returns a pointer to
+		an ENIGMA object.  This pointer must be passed to the
+		enigmaEncrypt() and enigmaDecrypt() routines.  This allows you
+		to open more than one ENIGMA object using different key and
+		seed combinations for each and to concurrently encrypt or
+		decrypt multiple data streams, rather than having to process
+		each stream sequentially.
+
+		Warning:  The seed is not a NUL terminated string, it is just
+		an array of 2 characters.  The NUL character could be one (or
+		both) of the characters in the seed.  If you allow enigmaOpen()
+		to select a random seed for you, you may determine its value
+		by referring to the seed member of the ENIGMA object returned
+		by enigmaOpen().
+
+enigmaClose:
+
+	#include "engima.h"
+
+	void enigmaClose ( ENIGMA *enigma )
+
+		When you are through encrypting or decrypting a stream, the
+		ENIGMA object associated with that stream should be closed
+		by a call to enigmaClose().  The enigma parameter is a pointer
+		to the object to be closed.  This releases the memory resources
+		used by the object back to the operating system.
+
+enigmaEncrypt/enigmaDecrypt:
+
+	#include "engima.h"
+
+	unsigned char *enigmaEncrypt ( ENIGMA *enigma, unsigned char *buffer,
+							int bufferSize )
+	unsigned char *enigmaDecrypt ( ENIGMA *enigma, unsigned char *buffer,
+							int bufferSize )
+
+		The enigmaEncrypt() and enigmaDecrypt() routines are
+		complementary routines for encrypting and decrypting data.
+		The enigma parameter is a pointer to the ENIGMA object
+		associated with the stream to be encrypted or decrypted.
+		The buffer parameter is a pointer to the data to be encrypted
+		or decrypted.  The bufferSize parameter indicates how many
+		characters are in the buffer to be encrypted or decrypted.
+		The function returns a pointer to the encrypted or decrypted
+		data.  However, the encrypted/decrypted data will always
+		be returned in the same buffer that was originally passed
+		in to the encrypt/decrypt routine.  Keep that in mind, your
+		original data will be written over by the encrypt/decrypt
+		routines.  If you need to preserve the original data, make
+		a copy before calling the encrypt/decrypt routines.
+
+		The enigmaOpen() routine must be called before the first call
+		to enigmaEncrypt() or enigmaDecrypt() to obtain the ENIGMA
+		object required by these routines.
+
+setRotors/encrypt/decrypt:
+
+	These functions are included for backwards compatibility with previous
+	versions of these libraries.  No documentation of them will be provided
+	here, use the new functions.  If you have existing code that used the
+	old functions, you may use the new libraries without having to revise
+	your code.  However, I recommend that you revise the code as soon as
+	possible to get the added benefits of the new functions, and because
+	I won't guarantee that these functions will be included in future
+	releases of these libraries.
+
+EXAMPLES
+
+The example files (encrypt.c decrypt.c and makefile) show you how to create 4
+pairs of simple filters that encrypt and decrypt the data piped to them.  The
+examples mostly work, but if you are trying to get this to work in the
+Windows/DOS environment, be aware that Windows and DOS are defective when it
+comes to pipes and filters and these example programs will not work as-is for
+all types of input data.  The encrypt89/decrypt89 and encrypt97/decrypt97
+filters should work correctly in the Windows/DOS environment as long as input
+is restricted to printable ASCII characters or text files and you don't mind
+UNIX style text files getting converted to DOS style text files.  However,
+the purpose here is to get you started writing your own program where you
+will no doubt correct all the deficiencies of these examples.
+
+
+THEORY
+
+The Enigma encryption/decryption processes are all character substitution
+ciphers.  Routines in each enigma library have a different cipher set and a
+different (though highly similar) set of character substitution rules from
+which to choose.
+
+A cipher set is a subset of all the possible 8-bit byte values, and defines
+which characters participate in the cipher.  When one of the enigma
+encryption/decryption routines encounters a character from its cipher set
+it applies one of its character substitution rules to select another
+character from its cipher set and replaces the original character with the
+new one.  If a character not in the cipher set is encountered, it is not
+replaced.
+
+The number of character substitution rules is large, but not huge (varying
+from 7,744 for enigma89 to 65,536 for enigma).  The rules are selected in a
+predetermined order, a new rule for each charater encrypted.  The sequence of
+rule selection has a very large period (meaning the sequence repeats itself
+after the number of characters specified by the period have been encrypted).
+The period of rule selection sequences varies depending on the number of
+rotors selected and which algorithm is used.  The concept of rotors is
+analogous to rotors in the original Enigma engine and more rotors makes the
+encryption more secure from brute force attacks.  The number of rotors is
+specified by the maxRotors parameter to the enigmaOpen() routine.  The minimum
+allowed is 4.  The period of rule selection for a 4 rotor machine varies from
+59,9569,536 for an enigma89 machine to 4,294,967,296 for the full enigma
+machine.
+
+Having a large number of character substitution rules is helpful, but far less
+important than the rule selection sequence having a long period.  It is the
+period of the rule selection sequence which is the upper limit on the number
+of unique outputs that can be produced from a given input.  The exact output
+produced for any given input is controlled by where in the rule selection
+sequence the process begins.  This in turn is controlled by the key and the
+seed parameters.
+
+Below are brief summaries of the encryption/decryption processes implemented
+in the various engima libraries.
+
+enigma.lib:
+	The cipher set is the complete set of all 8-bit bytes.
+
+	It selects from 65,536 character substitution rules.
+
+	The period of the rule selection sequence is 4,294,967,296 for
+	a 4 rotor machine, with each additional rotor increasing the
+	period by a factor of 256.
+
+	Useful for encrypting binary data, or any data if you don't
+	care whether the cipher text is readable by a text editor or
+	some other process that expects ASCII input.
+
+enigma127.lib:
+	The cipher set is all ASCII characters except NUL (0x0) and DEL
+	(0x7F).
+
+	It selects from 15,876 character substitution rules.
+
+	The period of the rule selection sequence is 252,047,376 for
+	a 4 rotor machine, with each additional rotor increasing the
+	period by a factor of 126.
+
+	Useful for encrypting ASCII data where you wish to limit the output
+	to ASCII data.  The output will be guaranteed to be in the ASCII
+	character set as long as the input was.  Nevertheless, it is virtually
+	certain to be  meaningless to any process expecting ASCII input (except
+	of course processes implementing encryption/decryption with the
+	enigma127 library routines).
+
+enigma97.lib:
+	The cipher set is all printable ASCII characters including space and
+	horizontal tab, but excluding linefeed and carriage return.
+
+	It selects from 9,216 character substitution rules.
+
+	The period of the rule selection sequence is 84,934,656 for
+	a 4 rotor machine, with each additional rotor increasing the
+	period by a factor of 96.
+
+	Useful for text files.  The output is guaranteed to be printable
+	ASCII if the input was.  It preserves linefeeds and carriage returns
+	(e.g line breaks) so that it will never create lines longer than the
+	input lines (except the first line which includes the 2 seed
+	characters).  It does not preserve space or tab, so the length of
+	words cannot be easily deduced.
+
+enigma89.lib:
+	The cipher set is almost all the printable ASCII characters excluding
+	white space characters and '"', '%', '&', '\'', '\\' and '`'.
+
+	It selects from 7,744 character substitution rules.
+
+	The period of the rule selection sequence is 59,969,536 for
+	a 4 rotor machine, with each additional rotor increasing the
+	period by a factor of 88.
+
+	Useful for web data and email messages where you don't want the output
+	to contain white space or quoted text or escaped characters with
+	special meaning to HTTP or SMTP or where you want to preserve these
+	characters along with their special meanings.  You can guarantee no
+	white space in the output only if there was none in the input.  Any
+	white space in the input is preserved so the length of words, lines
+	and paragraphs can easily be deduced.
+
+
+ANCILLARY MAP/UNMAP FUNCTIONS:
+
+The libraries also contain some ancillary map/unmap functions that are used
+internally by the setRotors(), encrypt() and decrypt() functions.  Since these
+functions are in the libraries and might be of interest to you, header files
+and documentation are included so you can use them if you wish.
+
+The mapX() functions map the cipher set to the values 0 to 1 less than the
+cardinality of the cipher set.  All characters not in the cipher set return
+a value of -1.  You may find these functions useful for testing if a character
+is in the cipher set.
+
+The unmapX() functions reverse the mapX() functions.  The following code:
+
+	c = unmapX(mapX(c));
+
+assigns -1 to c if c was not in the cipher set, otherwise c is unchanged.
+
+Here are the technical details.
+
+map89/unmap89:
+
+	#include "map89.h"
+
+	int map89 ( unsigned int c )
+
+		The character c is mapped onto the range [0-87] or -1 if c is
+		not in the cipher set of the enigma89 encryption/decryption
+		routines.
+
+	int unmap89 ( unsigned int c )
+
+		The integer c is mapped onto the cipher set of the enigma89
+		encryption/decryption routines.  If c is greater than 87,
+		EOF is returned.
+
+map97/unmap97:
+
+	#include "map97.h"
+
+	int map97 ( unsigned int c )
+
+		The character c is mapped onto the range [0-96] or -1 if c is
+		not in the cipher set of the enigma97 encryption/decryption
+		routines.
+
+	int unmap97 ( unsigned int c )
+
+		The integer c is mapped onto the cipher set of the enigma97
+		encryption/decryption routines.  If c is greater than 96,
+		EOF is returned.
+
+map127/unmap127:
+
+	#include "map127.h"
+
+	int map127 ( unsigned int c )
+
+		The character c is mapped onto the range [0-126] or -1 if c is
+		not in the cipher set of the enigma127 encryption/decryption
+		routines.
+
+	int unmap127 ( unsigned int c )
+
+		The integer c is mapped onto the cipher set of the enigma127
+		encryption/decryption routines.  If c is greater than 126,
+		EOF is returned.
+
+
+MAP/UNMAP MACROS
+
+Each of the mapX.h header files defines 2 macros MAP() and UNMAP().  These
+macros resolve to the appropriate mapX() and unmapX() routines depending on
+which mapX.h header is included.
+
+The map257.h header is included for completeness to define the MAP and UNMAP
+macros when using the enigma.lib library.  Since the cipher set is the full
+8-bit character set, no mapX() or unmapX() functions are needed.  This header
+ensures correct behavior of the MAP and UNMAP macros when using the enigma.lib
+library routines.
